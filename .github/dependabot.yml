@@ -1,0 +1,42 @@
+# Mirrors qualflare-cli's setup, adapted to an npm package.
+#
+# Only the repo root is watched. `examples/basic` and
+# `test/integration/fixtures/*` also carry a package.json, but they are demo and
+# fixture projects with no lockfile that resolve against the root's
+# node_modules, so updating them would produce PRs that change nothing that runs.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: "chore"
+    groups:
+      # Minor and patch together, so a routine week is one PR rather than ten.
+      # Majors stay separate: for the framework devDep a major is real signal --
+      # it is how we learn there is a new version to add a CI matrix leg for.
+      minor-patch:
+        update-types:
+          - minor
+          - patch
+    ignore:
+      # package.json declares `engines: { node: ">=18" }`. Typechecking against
+      # a newer @types/node would quietly accept APIs that do not exist on the
+      # oldest Node we claim to support, and nothing in CI would fail. Raise this
+      # deliberately, together with the engines floor, or not at all.
+      - dependency-name: "@types/node"
+        update-types:
+          - version-update:semver-major
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: "chore"
+    groups:
+      actions:
+        update-types:
+          - minor
+          - patch
