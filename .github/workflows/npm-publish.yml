@@ -29,7 +29,7 @@ jobs:
         with:
           # Matches ci.yml's unit job, so the tarball is built on the same
           # Node the test suite ran against. `engines` allows >=18.
-          node-version: '20'
+          node-version: '24'
           registry-url: 'https://registry.npmjs.org'
 
       - run: npm ci
