@@ -1,0 +1,54 @@
+name: Publish npm
+
+# Mirrors qualflare-cli's provenance-OIDC publish pattern (id-token: write +
+# npm's Sigstore-backed provenance attestations), simplified for this package:
+# qualflare-cli's real publish workflow builds Go binaries via goreleaser
+# first, since its npm package is a thin binary-download wrapper — this
+# package has no compiled binary, so publish is just build + npm publish on
+# a version tag.
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: read
+
+jobs:
+  npm-publish:
+    name: Publish @qualflare/jest
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # npm provenance attestations via Sigstore OIDC
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          # Matches ci.yml's unit job, so the tarball is built on the same
+          # Node the test suite ran against. `engines` allows >=18.
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+
+      - run: npm ci
+
+      - name: Verify tag matches package.json version
+        run: |
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          PKG_VERSION="$(node -p "require('./package.json').version")"
+          if [ "$TAG_VERSION" != "$PKG_VERSION" ]; then
+            echo "::error::tag $GITHUB_REF_NAME (version $TAG_VERSION) does not match package.json version $PKG_VERSION"
+            exit 1
+          fi
+
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm run build
+      - run: npm test
+
+      - name: Publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish

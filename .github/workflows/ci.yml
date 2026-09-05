@@ -1,0 +1,161 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  unit:
+    name: Build, lint, typecheck, unit test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm run build
+      - run: npm test
+
+  integration:
+    name: Integration (real jest run) — jest ${{ matrix.jest }}
+    runs-on: ubuntu-latest
+    needs: unit
+    strategy:
+      fail-fast: false
+      matrix:
+        # Validates the `peerDependencies["jest"]` range (">=29.0.0")
+        # empirically rather than by assertion. The range is open-ended, so this
+        # matrix can only ever prove the versions that existed when it was last
+        # touched — add a leg when Jest ships a notable minor; the range itself
+        # needs no edit.
+        #
+        # The floor leg is the load-bearing one. Per-attempt history is built
+        # from `AssertionResult.invocations` and `.retryReasons`; both were
+        # verified present in 29.7 before that floor was declared, and this leg
+        # is what keeps that true.
+        include:
+          - jest: '29.7.0'
+            node: '20'
+          - jest: '30.0.5'
+            node: '20'
+          - jest: '30.5.1'
+            node: '22'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - name: Install with matrix Jest version
+        # package.json is edited with node rather than `npm pkg set`: the
+        # runner's npm and a local npm disagreed about that step twice in the
+        # sibling repos, and each failure surfaced only as an arborist crash
+        # ("Cannot read properties of null (reading 'edgesOut')") naming neither
+        # the package nor the conflict. A JSON edit does the same job with no
+        # npm behaviour in the way.
+        #
+        # The lockfile is removed because these legs deliberately install a tree
+        # it does not describe.
+        run: |
+          node -e '
+            const fs = require("fs");
+            const pkg = JSON.parse(fs.readFileSync("package.json", "utf8"));
+            const v = process.env.JEST_VERSION;
+            pkg.devDependencies.jest = v;
+            pkg.devDependencies["@jest/reporters"] = v;
+            pkg.devDependencies["@jest/test-result"] = v;
+            fs.writeFileSync("package.json", JSON.stringify(pkg, null, 2) + "\n");
+          '
+          rm -f package-lock.json
+          npm install --loglevel=error
+        env:
+          JEST_VERSION: ${{ matrix.jest }}
+
+      - name: Confirm the matrix version is the one actually installed
+        # Cheap, and it catches a resolution that quietly ignored the pin —
+        # otherwise three green legs could all be testing the same version.
+        run: |
+          INSTALLED="$(node -p "require('jest/package.json').version")"
+          echo "installed jest: $INSTALLED (matrix asked for ${{ matrix.jest }})"
+          case "$INSTALLED" in
+            ${{ matrix.jest }}*) ;;
+            *) echo "::error::jest $INSTALLED installed, expected ${{ matrix.jest }}"; exit 1 ;;
+          esac
+      # The fixture project loads the reporter from BUILT dist/, so this is not
+      # optional -- without it the integration suite cannot resolve the package.
+      - run: npm run build
+      - run: npm run test:integration
+
+  example:
+    name: Example project (packaged tarball)
+    runs-on: ubuntu-latest
+    needs: unit
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: Pack and install into examples/basic
+        # Installs the PACKED TARBALL, not the working tree, so a broken
+        # `files` or `exports` map fails here instead of after publishing.
+        # Every local check passes happily with a package that cannot be
+        # consumed once installed by name.
+        run: |
+          TARBALL="$(npm pack --silent | tail -1)"
+          cd examples/basic
+          npm install --no-audit --no-fund "../../$TARBALL"
+      - name: Run the example as its README documents
+        working-directory: examples/basic
+        run: npm test
+      - name: Assert it produced a usable report
+        working-directory: examples/basic
+        run: |
+          node -e '
+            const fs = require("node:fs");
+            const dir = "qualflare-results";
+            const files = fs.readdirSync(dir).filter((f) => f.endsWith(".json"));
+            if (files.length !== 1) throw new Error(`expected 1 report, got ${files.length}`);
+            const report = JSON.parse(fs.readFileSync(`${dir}/${files[0]}`, "utf8"));
+            if (!report.metadata) throw new Error("missing metadata — the CLI keys format detection on it");
+            if ("config" in report) throw new Error("top-level config key — that is the Playwright-JSON signature");
+            if (report.framework !== "jest") throw new Error(`framework=${report.framework}, expected jest`);
+            const cases = report.suites.flatMap((s) => s.cases);
+            if (cases.length === 0) throw new Error("report contains no cases");
+            console.log(`ok: ${report.suites.length} suite(s), ${cases.length} case(s)`);
+          '
+
+  no-network:
+    name: Reporter makes no network calls
+    runs-on: ubuntu-latest
+    needs: unit
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: Grep the BUILT bundle for any HTTP client
+        # Asserted against the shipped bundle rather than a mock server, on
+        # purpose: a sibling repo's mock once implemented an endpoint the real
+        # API never served, which hid a broken upload for two releases. A mock
+        # can lie about the network; the absence of a client cannot.
+        run: |
+          if grep -rnE "fetch\(|axios|node-fetch|require\(['\"](http|https|node:http)|from ['\"](http|https|node:http)" \
+               dist --include='*.js' --include='*.cjs'; then
+            echo "::error::an HTTP client reached the shipped bundle"
+            exit 1
+          fi
+          echo "ok: no HTTP client in dist"

@@ -1,0 +1,112 @@
+# Dogfood: qualflare-jest reports on a suite of itself, and the PUBLISHED
+# CLI uploads the result to Qualflare.
+#
+# Why this exists: every other suite in this repo stops at the report file on
+# disk, so nothing exercised the reporter/CLI pairing. That seam broke twice --
+# `Case.attempts` was silently discarded by the CLI's parser for three
+# releases, and `localImagePath` needed a CLI floor nothing enforced. Both would
+# have shown up here on day one.
+#
+# The CLI is deliberately UNPINNED. A CLI release that stops understanding what
+# this reporter emits should turn this red; that is the whole point.
+#
+# The suite contains NO failing tests by construction. Status mapping for
+# failed/error/timeout/hook-failure stays the job of test/integration/ -- please
+# do not "helpfully" add a failing test here.
+name: E2E
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: e2e-${{ github.ref }}
+  # NOT cancel-in-progress. Every push to main should produce its own launch;
+  # cancelling would silently drop commits out of the Qualflare trend line,
+  # which is the one thing this workflow exists to provide.
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  e2e:
+    name: Dogfood suite + upload to Qualflare
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # branch/commit come from GITHUB_REF_NAME/GITHUB_SHA, so no history
+          # is needed for git detection.
+          fetch-depth: 1
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      # The suite loads the reporter from dist/, so this is not optional.
+      - name: Build
+        run: npm run build
+
+      # continue-on-error on the next two steps, with a gate at the end. A red
+      # dogfood run is precisely the run Qualflare most needs to see: failing
+      # before the upload would hide the regression from the dashboard that
+      # exists to show it. The job still fails -- just after the data is in.
+      - name: Run the dogfood suite
+        id: suite
+        continue-on-error: true
+        run: npm run test:e2e
+
+      - name: Verify the report matches what the suite declared
+        id: verify
+        continue-on-error: true
+        run: npm run verify:e2e
+
+      - name: Install the published CLI
+        run: |
+          npm install -g @qualflare/cli
+          # Printed so a red run caused by a CLI release is diagnosable from the
+          # log alone, without a commit of ours to point at.
+          qf version
+
+      # `--force` is required: stdin is not a TTY here, and a re-login onto an
+      # existing identifier fails without it. The token is passed via the
+      # environment, NOT argv, so it never lands in the process list. `qf <id>
+      # collect` only EXISTS after a successful login -- the subcommand is built
+      # from the credential store at startup -- so these cannot be reordered.
+      #
+      # No -e flag: the reporter records environment: 'production' in the report
+      # itself, so there is one source of truth rather than two that can drift.
+      - name: Upload to Qualflare
+        if: hashFiles('e2e-results/*.json') != ''
+        env:
+          QF_TOKEN: ${{ secrets.QF_TOKEN }}
+          QF_BRANCH: ${{ github.ref_name }}
+          QF_COMMIT: ${{ github.sha }}
+        run: |
+          if [ -z "$QF_TOKEN" ]; then
+            echo "::error::QF_TOKEN is not set on this repository."
+            exit 1
+          fi
+          qf login qualflare-jest --force
+          qf qualflare-jest collect ./e2e-results
+
+      - name: Keep the report when something went wrong
+        if: steps.suite.outcome != 'success' || steps.verify.outcome != 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-results
+          path: e2e-results/
+          retention-days: 7
+          if-no-files-found: warn
+
+      - name: Fail if the suite or the verifier was red
+        if: steps.suite.outcome != 'success' || steps.verify.outcome != 'success'
+        run: |
+          echo "::error::suite=${{ steps.suite.outcome }} verify=${{ steps.verify.outcome }}"
+          exit 1

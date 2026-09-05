@@ -1,0 +1,15 @@
+node_modules/
+dist/
+coverage/
+*.log
+.DS_Store
+*.tgz
+
+# Integration fixture output
+test/integration/fixtures/**/qualflare-results/
+
+# Example project output
+examples/**/qualflare-results/
+
+# Dogfood suite output (e2e/) — the report plus any images it writes.
+e2e-results/

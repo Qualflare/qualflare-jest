@@ -1,0 +1,13 @@
+{
+  "name": "qualflare-jest-example",
+  "private": true,
+  "version": "0.0.0",
+  "type": "commonjs",
+  "scripts": {
+    "test": "jest"
+  },
+  "devDependencies": {
+    "@qualflare/jest": "file:../../qualflare-jest-0.1.0.tgz",
+    "jest": "^30.5.1"
+  }
+}

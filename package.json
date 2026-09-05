@@ -1,0 +1,85 @@
+{
+  "name": "@qualflare/jest",
+  "version": "0.1.0",
+  "description": "Native Jest reporter for Qualflare — captures status, per-attempt retry history, flakiness, attachments and author-facing metadata straight from your jest run.",
+  "keywords": [
+    "jest",
+    "jest-reporter",
+    "qualflare",
+    "test-reporting",
+    "test-results",
+    "reporter"
+  ],
+  "homepage": "https://qualflare.com",
+  "bugs": {
+    "url": "https://github.com/Qualflare/qualflare-jest/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Qualflare/qualflare-jest.git"
+  },
+  "license": "Apache-2.0",
+  "author": "Qualflare",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./reporter": {
+      "types": "./dist/reporter/index.d.ts",
+      "import": "./dist/reporter/index.js",
+      "require": "./dist/reporter/index.cjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "peerDependencies": {
+    "jest": ">=29.0.0"
+  },
+  "dependencies": {
+    "ci-info": "^4.0.0"
+  },
+  "devDependencies": {
+    "@jest/reporters": "^30.5.1",
+    "@jest/test-result": "^30.5.1",
+    "@types/jest": "^29.5.14",
+    "@types/node": "^18.19.50",
+    "eslint": "^9.9.1",
+    "execa": "^9.3.1",
+    "jest": "^30.5.1",
+    "prettier": "^3.3.3",
+    "tsup": "^8.2.4",
+    "typescript": "^5.6.2",
+    "typescript-eslint": "^8.5.0",
+    "vitest": "^3.2.0"
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "test": "vitest run test/unit",
+    "test:integration": "vitest run test/integration --pool=forks --testTimeout=120000",
+    "test:all": "npm run test && npm run test:integration",
+    "prepublishOnly": "npm run build",
+    "test:e2e": "node -e \"require('node:fs').rmSync('e2e-results',{recursive:true,force:true})\" && jest --config e2e/jest.config.mjs",
+    "verify:e2e": "node e2e/verify-report.mjs",
+    "e2e": "npm run test:e2e && npm run verify:e2e"
+  }
+}
