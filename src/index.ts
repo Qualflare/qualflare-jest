@@ -22,7 +22,7 @@ export type {
   Suite,
 } from './shared/types.js';
 
-/** The tuple form Jest accepts in `test.reporters`: a module specifier and
+/** The tuple form Jest accepts in `reporters`: a module specifier and
  * its options. Jest types this as `[ReporterName, Record<string, unknown>]`,
  * where the options are unchecked. */
 export type QualflareReporterDescription = ['@qualflare/jest/reporter', QualflareJestOptions];

@@ -5,7 +5,7 @@ import { detectCi, type CiMetadata } from './ci-detect.js';
 import { detectGit, type GitInfo } from './git-detect.js';
 
 /** Options for the reporter, passed as the second element of its entry in
- * `jest.config.ts`'s `test.reporters` array:
+ * `jest.config.js`'s top-level `reporters` array:
  * `[['@qualflare/jest/reporter', { ... }]]`. Every field here also has an
  * environment-variable override — see the precedence table in
  * `docs/CONFIGURATION.md`. */
@@ -56,8 +56,10 @@ export interface QualflareJestOptions {
    *
    * Auto-detected, in order: `QUALFLARE_SHARD_INDEX`, then Jest's own
    * `--shard i/N`, which the resolved config exposes as
-   * `jest.config.shard` ({ index, count }) and the reporter reads in
-   * `onInit`. That `index` is 1-BASED, matching the `--shard=2/3` CLI form,
+   * `globalConfig.shard` ({ shardIndex, shardCount }) and the reporter reads in
+   * its CONSTRUCTOR -- Jest reporters have no `onInit` hook; that is a
+   * Vitest/Playwright name, and an earlier version of this comment invented
+   * both it and the field shape. `shardIndex` is 1-BASED, matching `--shard=2/3`,
    * so the reporter converts it before passing it here as
    * `deps.detectedShardIndex`.
    *
@@ -120,7 +122,7 @@ function envInt(...names: string[]): number | undefined {
 
 
 /** Resolves the full reporter configuration from, in order: the explicit
- * `options` (the second element of the `jest.config.ts` reporter
+ * `options` (the second element of the `jest.config.js` reporter
  * tuple, `['@qualflare/jest', { ... }]`), then `QUALFLARE_*`
  * environment variables, then `QF_*` (compat alias with the existing Go
  * CLI, where an equivalent exists), then a hardcoded default.
@@ -158,6 +160,8 @@ export function resolveConfig(
 
   const enabled = options.enabled ?? envBool('QUALFLARE_ENABLED') ?? true;
   // `||`, not `??` — matching `environment`/`language` below: an explicit
+  // empty string is a user mistake, not a deliberate choice, so it falls
+  // through to the default rather than being honoured.
   const outputDir = options.outputDir || firstEnv('QUALFLARE_OUTPUT_DIR') || './qualflare-results';
   const shardIndex = options.shardIndex ?? envInt('QUALFLARE_SHARD_INDEX') ?? deps.detectedShardIndex;
 

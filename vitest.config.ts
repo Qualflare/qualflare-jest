@@ -15,7 +15,7 @@ export default defineConfig({
     environment: 'node',
     include: ['test/unit/**/*.test.ts', 'test/integration/*.test.ts'],
     // The fixture project's own tests are .test.ts too, and are meant to be run
-    // by the child `vitest` process the integration suite spawns — never by
+    // by the child `jest` process the integration suite spawns — never by
     // this one. Without this they are collected here as well, so the fixtures
     // that fail BY DESIGN (failing, flaky) fail the package's own suite.
     exclude: ['**/node_modules/**', 'test/integration/fixtures/**'],

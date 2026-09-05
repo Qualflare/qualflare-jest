@@ -36,11 +36,6 @@ function registerBoundaryHook(): void {
 
 registerBoundaryHook();
 
-/** Tracks `qualflare.step()` nesting so `step_stop` pairs with the right
- * `step_start`. A plain depth counter is enough because the reporter rebuilds
- * `parentIndex` from the arrival order of the pairs. */
-let openSteps = 0;
-
 /**
  * The author-facing metadata API.
  *
@@ -132,7 +127,6 @@ export const qualflare = {
     const startedAt = Date.now();
     try {
       emit({ type: 'step_start', name, timestamp: startedAt });
-      openSteps += 1;
     } catch {
       // Bookkeeping only; never let it touch the body below.
     }
@@ -150,9 +144,6 @@ export const qualflare = {
 
 function closeStep(status: 'passed' | 'failed', error?: string): void {
   try {
-    if (openSteps > 0) {
-      openSteps -= 1;
-    }
     emit({ type: 'step_stop', status, ...(error ? { error } : {}), timestamp: Date.now() });
   } catch {
     logger.warn('could not record the end of a qualflare.step()');

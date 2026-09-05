@@ -1,7 +1,8 @@
 {
-  "name": "qualflare-jest-example",
+  "name": "qualflare-jest-basic-example",
   "private": true,
   "version": "0.0.0",
+  "description": "Minimal Jest project wired to @qualflare/jest, as the package README describes.",
   "type": "commonjs",
   "scripts": {
     "test": "jest"

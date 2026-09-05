@@ -25,6 +25,13 @@ interface JestTest {
   path: string;
 }
 
+/** Only the fields this reporter reads. `shard` is present when the run was
+ * started with `--shard=i/N`. */
+interface JestGlobalConfig {
+  rootDir?: string;
+  shard?: { shardIndex: number; shardCount: number };
+}
+
 export interface JestAssertionResult {
   ancestorTitles: string[];
   fullName: string;
@@ -63,10 +70,16 @@ export default class QualflareReporter {
   private readonly consoleByFile = new Map<string, string[]>();
   private readonly exitCleanup = (): void => this.cleanupChannel();
 
-  constructor(globalConfig?: { rootDir?: string }, options: QualflareJestOptions = {}) {
+  constructor(globalConfig?: JestGlobalConfig, options: QualflareJestOptions = {}) {
     this.options = options;
     this.rootDir = globalConfig?.rootDir || process.cwd();
-    this.config = resolveConfig(this.options, {});
+    // Jest's shard is 1-BASED (`--shard=1/3` is the first shard); ours is
+    // 0-based, matching every other Qualflare reporter. The field is
+    // `{ shardIndex, shardCount }` -- NOT `{ index, count }`, which is what an
+    // earlier version of this comment and the docs both claimed.
+    const detectedShardIndex =
+      globalConfig?.shard?.shardIndex !== undefined ? globalConfig.shard.shardIndex - 1 : undefined;
+    this.config = resolveConfig(this.options, { detectedShardIndex });
     // Resolve outputDir ONCE so every consumer sees the same absolute path.
     // Resolving again at a use site is what let the report and its screenshots
     // land in different directories in two sibling reporters -- the report was
@@ -117,6 +130,15 @@ export default class QualflareReporter {
 
   onRunComplete(_contexts?: unknown, results?: { testResults?: JestTestResult[] }): void {
     this.guard('onRunComplete', () => {
+      // `enabled: false` must be a COMPLETE no-op, which is what both
+      // resolve-config and docs/CONFIGURATION.md promise. Checked here rather
+      // than in the constructor so the channel is still torn down: an
+      // already-created directory must not be orphaned just because the user
+      // disabled reporting after it existed.
+      if (!this.config.enabled) {
+        this.cleanupChannel();
+        return;
+      }
       try {
         this.writeReport(results?.testResults ?? []);
       } finally {
@@ -160,7 +182,27 @@ export default class QualflareReporter {
     }
 
     const suites = groupIntoSuites(cases);
+    if (suites.length === 0) {
+      // Without this, `jest --watch` writes one report per keystroke -- each
+      // with a different runId, into the directory `qf collect` merges. That
+      // feeds hundreds of mutually-stale files to the very mechanism built to
+      // reject one.
+      logger.info('no test results were captured this run — skipping file write.');
+      return;
+    }
+
     const collect = buildCollectPayload(suites, this.config);
+
+    // Stamped after the payload is built, so every case in every suite carries
+    // it. Without this a sharded CI run produces reports with no shard
+    // attribution at all, while the config resolves the value and drops it.
+    if (this.config.shardIndex !== undefined) {
+      for (const suite of collect.suites) {
+        for (const testCase of suite.cases) {
+          testCase.shardIndex = this.config.shardIndex;
+        }
+      }
+    }
 
     const outputDir = this.config.outputDir;
     fs.mkdirSync(outputDir, { recursive: true });

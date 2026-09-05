@@ -8,7 +8,10 @@ coverage/
 # Integration fixture output
 test/integration/fixtures/**/qualflare-results/
 
-# Example project output
+# Example project output. node_modules too: the `example` CI job installs a
+# packed tarball in there, so a local run of that job would otherwise leave an
+# untracked tree behind.
+examples/**/node_modules/
 examples/**/qualflare-results/
 
 # Dogfood suite output (e2e/) — the report plus any images it writes.

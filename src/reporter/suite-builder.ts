@@ -27,8 +27,8 @@ export interface CaseWithFile {
 /**
  * Groups finished cases into one Suite per test module (file).
  *
- * Grouping happens once at `onTestRunEnd` rather than incrementally: Jest
- * interleaves results across worker threads, so there is no point during the
+ * Grouping happens once at `onRunComplete` rather than incrementally: Jest
+ * interleaves results across worker processes, so there is no point during the
  * run at which one module's cases are known to be complete.
  */
 export function groupIntoSuites(cases: readonly CaseWithFile[]): Suite[] {

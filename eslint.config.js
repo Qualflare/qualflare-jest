@@ -9,10 +9,10 @@ export default tseslint.config(
       'node_modules/**',
       'test/integration/fixtures/**',
       // A standalone example project with its own package.json/dependency
-      // resolution (imports '@qualflare/playwright' by its published name,
+      // resolution (imports '@qualflare/jest' by its published name,
       // not a relative path) — not part of this repo's own TS project graph.
       'examples/**',
-      // The dogfood suite: a standalone Vitest project that loads the reporter
+      // The dogfood suite: a standalone Jest project that loads the reporter
       // from built dist/, exactly like the fixtures above. Outside tsconfig's
       // `include: ['src']`, so type-aware linting cannot parse it.
       'e2e/**',

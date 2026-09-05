@@ -27,8 +27,14 @@ per-attempt errors from Vitest's accumulated error list, which needs no opt-in.
 ## Captured output is per file, not per test
 
 Jest hands reporters one console buffer per test **file** (`TestResult.console`), with no reliable
-attribution to individual tests. So a case's `stdout` is the output of the file it lives in, shared
-by every case in that file.
+attribution to individual tests. So a case's `stdout` is the output of the file it lives in, not of
+that test specifically.
+
+Because of that, it is attached to **failing cases only**. Attaching a file's buffer to every case
+duplicated it once per test: a 300-test file logging 16KB produced roughly 4.8MB of byte-identical
+text in a single report, against `/collect`'s 10MB body limit — and unlike attachments, output is
+charged against no budget. Failures are where captured output is worth reading, and the duplication
+is then bounded by the number of failures rather than the number of tests.
 
 The sibling reporters do not have this caveat, because their frameworks scope captured output to the
 test. Nothing here can narrow it without parsing console origins, which would be guesswork.
@@ -39,7 +45,8 @@ test. Nothing here can narrow it without parsing console origins, which would be
 `currentTestName` outside a test body. A call in `beforeAll`, `afterAll` or at module scope
 therefore has nothing to attach to.
 
-Those calls are discarded with a one-time warning rather than attached to whichever test reports
+Those calls are discarded with a warning — once per test file, which names every file with the
+problem rather than only the first — rather than attached to whichever test reports
 first. Attributing them by proximity is a misattribution bug the Cypress plugin already had to fix
 once, and silent wrong data is worse than absent data.
 
