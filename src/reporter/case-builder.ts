@@ -3,9 +3,11 @@ import {
   MAX_ATTEMPT_MESSAGE_RUNES,
   MAX_ATTEMPT_OUTPUT_LINES,
   MAX_ATTEMPT_OUTPUT_RUNES,
+  MAX_ATTACHMENTS_PER_CASE,
   MAX_ATTEMPTS_PER_CASE,
   MAX_LABELS_PER_CASE,
   MAX_LINKS_PER_CASE,
+  MAX_PARAMETERS_PER_STEP,
   MAX_STEPS_PER_TEST_ATTEMPT,
   MAX_TAG_LENGTH,
   MAX_TAGS_PER_CASE,
@@ -51,6 +53,11 @@ function mapStatus(status: string): CaseStatus {
     case 'todo':
     case 'disabled':
       return 'skipped';
+    // The seventh member of Jest's Status union, and the one most easily
+    // missed. Without this it fell to `default: 'failed'` and a focused test
+    // uploaded as a FAILURE -- a false red, which is worse than an unknown.
+    case 'focused':
+      return 'passed';
     default:
       return 'failed';
   }
@@ -218,8 +225,16 @@ export function replayMetadata(
           meta.caseParameters.push(param);
         } else {
           const step = meta.steps[openStep];
+          // Capped, and pushed rather than re-spread: the previous form
+          // allocated a fresh array per parameter, which is O(n^2) on a step
+          // that records many.
           if (step) {
-            step.parameters = [...(step.parameters ?? []), param];
+            if (!step.parameters) {
+              step.parameters = [];
+            }
+            if (step.parameters.length < MAX_PARAMETERS_PER_STEP) {
+              step.parameters.push(param);
+            }
           }
         }
         break;
@@ -389,13 +404,28 @@ export function buildCase(
   const attempts = buildAttempts(assertion, status);
   const invocations = Math.max(1, assertion.invocations ?? 1);
 
-  // Bounded to what the server stores. Jest gives console output per FILE, not
-  // per test, so this is the file's output attached to each of its cases --
-  // stated in LIMITATIONS.md rather than silently implied.
-  const stdout = clampOutputLines(consoleLines, MAX_ATTEMPT_OUTPUT_LINES, MAX_ATTEMPT_OUTPUT_RUNES);
+  // Jest gives console output per FILE, not per test, so this is the file's
+  // output -- and attaching it to EVERY case duplicated it N times. A 300-test
+  // file logging 16KB produced ~4.8MB of byte-identical text in one report,
+  // against /collect's 10MB limit, and unlike attachments it was charged
+  // against no budget at all.
+  //
+  // Attached to failing cases only: that is when captured output is worth
+  // reading, and it bounds the duplication to the number of failures rather
+  // than the number of tests. The per-file attribution caveat is in
+  // LIMITATIONS.md.
+  const stdout =
+    status === 'failed'
+      ? clampOutputLines(consoleLines, MAX_ATTEMPT_OUTPUT_LINES, MAX_ATTEMPT_OUTPUT_RUNES)
+      : undefined;
 
   return {
-    id: `${assertion.fullName}`,
+    // The FILE plus the full name. Jest has no per-test id of its own, and
+    // `fullName` alone is just the describe path plus the title — so two files
+    // each containing `test('works')` would produce the same id. The server's
+    // uniqueness is suite-scoped and this reporter emits one suite per file, so
+    // that would not collide today; this does not depend on that holding.
+    id: `${testFilePath}#${assertion.fullName}`,
     name: assertion.fullName,
     className: testFilePath,
     status,
@@ -409,7 +439,12 @@ export function buildCase(
     ...(tags.length > 0 ? { tags } : {}),
     properties,
     ...(stdout ? { stdout } : {}),
-    ...(meta.attachments.length > 0 ? { attachments: meta.attachments } : {}),
+    // Sliced like labels/links/tags. AttachmentBudget bounds the BYTES; nothing
+    // bounded the item COUNT, so a loop calling qualflare.attachment() produced
+    // an array the server then truncates or rejects.
+    ...(meta.attachments.length > 0
+      ? { attachments: meta.attachments.slice(0, MAX_ATTACHMENTS_PER_CASE) }
+      : {}),
     ...(meta.steps.length > 0 ? { steps: meta.steps } : {}),
     ...(meta.labels.length > 0 ? { labels: meta.labels.slice(0, MAX_LABELS_PER_CASE) } : {}),
     ...(meta.links.length > 0 ? { links: meta.links.slice(0, MAX_LINKS_PER_CASE) } : {}),

@@ -1,6 +1,6 @@
 # Configuration
 
-Options go in the reporter tuple in `jest.config.ts`:
+Options go in the reporter tuple in `jest.config.js`:
 
 ```ts
 const { qualflareReporter } = require('@qualflare/jest');
@@ -83,8 +83,8 @@ independently — setting `ciBuildNumber` by hand leaves the other three auto-de
 
 ## Shard detection
 
-Jest exposes `--shard i/N` on the resolved config as `jest.config.shard` ({ index, count }),
-which the reporter reads in `onInit`, so nothing needs configuring for sharded CI. Note Jest's
+Jest exposes `--shard i/N` on the resolved config as `globalConfig.shard` ({ shardIndex, shardCount }),
+which the reporter reads in its constructor, so nothing needs configuring for sharded CI. Note Jest's
 `index` is **1-based** (`--shard=1/3` is the first shard) while Qualflare's `shardIndex` is 0-based;
 the reporter converts it.
 

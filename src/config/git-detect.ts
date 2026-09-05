@@ -61,7 +61,7 @@ function detectCommitFromGit(exec: ExecGit, cwd: string): string | undefined {
  * "only shell out for what's actually missing" behavior (BUG-39 in that
  * file: forking `git` on every CLI invocation, even `--help`, was wasteful —
  * the same reasoning applies here, this reporter should not fork two `git`
- * processes on every Vitest run when CI env vars already cover both
+ * processes on every Jest run when CI env vars already cover both
  * values, or when the caller already resolved both from options/env at a
  * higher precedence tier and doesn't need this module at all).
  */

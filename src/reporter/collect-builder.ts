@@ -27,7 +27,7 @@ function resolveBrowser(config: ResolvedReporterConfig, browsers: readonly strin
 }
 
 /**
- * Assembles the final `Collect` payload at `onTestRunEnd`.
+ * Assembles the final `Collect` payload at `onRunComplete`.
  *
  * CI metadata and branch/commit detection are already fully resolved by
  * `resolve-config.ts` — this reads the resolved config through and does NOT

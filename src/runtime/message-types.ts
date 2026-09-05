@@ -1,15 +1,21 @@
 import type { CasePriority, LinkType, Parameter } from '../shared/types.js';
 
 /**
- * `qualflare.*()` calls (see `qualflare-api.ts`) are fire-and-forget: each one
- * is pushed onto `task.meta[QUALFLARE_META_KEY]` in the test worker, which
- * Vitest serializes over RPC and the reporter reads back as
- * `testCase.meta()`. Accumulation is therefore worker-side (a plain array on
- * the task) and replay is reporter-side, in `reporter/case-builder.ts`'s
- * `replayMetadata`.
+ * The message set carried by the metadata side-channel.
  *
- * Every field must survive JSON — `task.meta` crosses a process boundary, so
- * anything unserializable is silently lost rather than rejected.
+ * Each `qualflare.*()` call (see `qualflare-api.ts`) becomes one of these,
+ * appended as NDJSON in the test WORKER and replayed in the reporter, which
+ * runs in the MAIN process — see `channel.ts` for why that boundary exists and
+ * how it is crossed. There is no `task.meta` here and no RPC; that is Vitest's
+ * transport, and this file used to describe it by mistake.
+ *
+ * Every field must survive JSON: the channel is a file, so anything
+ * unserializable is silently lost rather than rejected.
+ *
+ * `step_start`/`step_stop` are deliberately a flat PAIR rather than a nested
+ * structure. An append-only channel cannot express nesting directly, but the
+ * arrival order of the pairs reconstructs it exactly — `case-builder.ts` walks
+ * the stream with a stack and recovers `parentIndex`.
  */
 export type RuntimeMessage =
   | { type: 'label'; name: string; value: string }
