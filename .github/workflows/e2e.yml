@@ -98,7 +98,7 @@ jobs:
 
       - name: Keep the report when something went wrong
         if: steps.suite.outcome != 'success' || steps.verify.outcome != 'success'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: e2e-results
           path: e2e-results/
