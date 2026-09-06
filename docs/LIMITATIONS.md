@@ -21,9 +21,6 @@ type, which marks the field optional and says nothing about when it is filled. T
 records the attempts and their statuses, because knowing a test failed twice before passing is worth
 having on its own, and logs a one-line hint the first time it sees the situation.
 
-This is the one place a sibling reporter does better by default: `@qualflare/vitest` reconstructs
-per-attempt errors from Vitest's accumulated error list, which needs no opt-in.
-
 ## Captured output is per file, not per test
 
 Jest hands reporters one console buffer per test **file** (`TestResult.console`), with no reliable
@@ -36,8 +33,7 @@ text in a single report, against `/collect`'s 10MB body limit — and unlike att
 charged against no budget. Failures are where captured output is worth reading, and the duplication
 is then bounded by the number of failures rather than the number of tests.
 
-The sibling reporters do not have this caveat, because their frameworks scope captured output to the
-test. Nothing here can narrow it without parsing console origins, which would be guesswork.
+Nothing here can narrow it without parsing console origins, which would be guesswork.
 
 ## Metadata outside a running test is dropped
 
@@ -47,8 +43,7 @@ therefore has nothing to attach to.
 
 Those calls are discarded with a warning — once per test file, which names every file with the
 problem rather than only the first — rather than attached to whichever test reports
-first. Attributing them by proximity is a misattribution bug the Cypress plugin already had to fix
-once, and silent wrong data is worse than absent data.
+first. Attributing them by proximity would be silent wrong data, which is worse than absent data.
 
 ## Two tests with the same full name in one file share metadata
 
@@ -62,8 +57,8 @@ only bites on literal duplicates, which are a lint smell in their own right.
 ## Metadata from an abandoned retry is discarded, not merged
 
 When a test is retried, each attempt emits its own metadata. The reporter keeps the **final**
-attempt's and discards the rest, matching the rule the sibling reporters document: steps, labels and
-attachments describe the attempt that decided the outcome.
+attempt's and discards the rest: steps, labels and attachments describe the attempt that decided the
+outcome.
 
 `attempts[]` still records every attempt's status, so nothing about the retry history is lost — only
 the metadata of attempts that were superseded.
@@ -88,27 +83,11 @@ reporter never makes a network call.
 attachment carries neither content nor a storage key the server records it from its name alone — an
 undownloadable placeholder. This is not something the reporter can detect for you.
 
-## Steps exist only in Qualflare
+## Caps
 
-`qualflare.step()` records a step in the report. Jest has no step concept of its own, so steps do not
-appear in Jest's own output, and a failing step surfaces as a failing test.
-
-Nesting is preserved via `parentIndex`, and steps are capped at 300 per attempt — well under the
-server's 1000-per-case limit — with anything beyond dropped and a warning logged.
-
-## `parameter()` masking redacts the value
-
-`qualflare.parameter(name, value, { masked: true })` sends the name and a masked marker, never the
-value. This is not a display hint: the value is dropped **in the worker**, before anything is
-serialized, so it never reaches the channel file on disk, the report, or the server.
-
-That ordering matters more here than in the sibling reporters, whose channel is memory. Here it is a
-file, so masking after the fact would already have written the secret.
-
-## Sharded CI: point every shard at the same `outputDir`
-
-Each Jest process writes one uniquely-named report, so shards never overwrite each other. Collect the
-directory once at the end and `qf collect` merges every file into a single Launch.
+Bounds applied per case, with anything beyond dropped and a warning logged: 300 steps per attempt,
+50 attachments, 100 labels, 20 links, 64 tags, 50 attempts. Attachment bytes are bounded per run by
+`maxTotalAttachmentBytes`.
 
 ## Not limitations of this reporter
 
