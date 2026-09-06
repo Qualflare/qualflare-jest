@@ -74,6 +74,13 @@ jobs:
           # log alone, without a commit of ours to point at.
           qf version
 
+      # Captured BEFORE the upload so the step after it can require the number to
+      # move. python3 is preinstalled on ubuntu-latest; the script is identical in
+      # every reporter repo so there is one implementation to fix, not seven.
+      - name: Record the project's run count before uploading
+        id: runs_before
+        run: echo "count=$(python3 e2e/assert-launch-landed.py qualflare-jest --print)" >> "$GITHUB_OUTPUT"
+
       # `--force` is required: stdin is not a TTY here, and a re-login onto an
       # existing identifier fails without it. The token is passed via the
       # environment, NOT argv, so it never lands in the process list. `qf <id>
@@ -83,6 +90,7 @@ jobs:
       # No -e flag: the reporter records environment: 'production' in the report
       # itself, so there is one source of truth rather than two that can drift.
       - name: Upload to Qualflare
+        id: upload
         if: hashFiles('e2e-results/*.json') != ''
         env:
           QF_TOKEN: ${{ secrets.QF_TOKEN }}
@@ -95,6 +103,14 @@ jobs:
           fi
           qf login qualflare-jest --force
           qf qualflare-jest collect ./e2e-results
+
+      # The upload's exit code only proves the server returned 2xx. This proves a
+      # launch reached the project the README's badge actually reads -- the two
+      # diverged for 11 consecutive green runs on qualflare-jest. Runs after the
+      # upload, so a failure here never costs us the data.
+      - name: Assert the launch reached the project the badge reads
+        if: steps.upload.outcome == 'success'
+        run: python3 e2e/assert-launch-landed.py qualflare-jest --before "${{ steps.runs_before.outputs.count }}"
 
       - name: Keep the report when something went wrong
         if: steps.suite.outcome != 'success' || steps.verify.outcome != 'success'
