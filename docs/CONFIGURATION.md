@@ -41,7 +41,7 @@ There is **no `token` option**. This reporter makes no network calls, so it has 
 | `ciRunUrl` | — | auto-detected | |
 | `ciPrNumber` | — | auto-detected | |
 | `maxAttachmentBytes` | `QUALFLARE_MAX_ATTACHMENT_BYTES` | `5000000` (5MB) | Per-attachment cap. Anything larger is skipped with a warning rather than truncated. The server's own ceiling is 50MB per file, so this can be raised. |
-| `maxTotalAttachmentBytes` | `QUALFLARE_MAX_TOTAL_ATTACHMENT_BYTES` | `10000000` (10MB) | Whole-run attachment budget; once spent, further attachments are skipped. It was 750KB while attachments were base64-inlined into `/collect`'s 10MB body — `@qualflare/cli` v0.1.22+ uploads them out of band, so this now bounds only the report file on disk. Videos, traces and **screenshots** are exempt; they are copied into `outputDir`, not inlined. What this budget still bounds is text — logs, JSON, markdown. |
+| `maxTotalAttachmentBytes` | `QUALFLARE_MAX_TOTAL_ATTACHMENT_BYTES` | `10000000` (10MB) | Whole-run attachment budget; once spent, further attachments are skipped. Counted in **encoded** bytes — base64 is what the report carries, so a 1MB file spends ~1.34MB of this. It was 750KB while attachments were base64-inlined into `/collect`'s 10MB body — `@qualflare/cli` v0.1.22+ uploads them out of band, so this now bounds only the report file on disk. Videos, traces and **screenshots** are exempt; they are copied into `outputDir`, not inlined. What this budget still bounds is text — logs, JSON, markdown. |
 | `debug` | `QUALFLARE_DEBUG` → `QF_DEBUG` | `false` | Extra detail on stderr. |
 
 ## Branch and commit auto-detection
