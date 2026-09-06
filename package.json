@@ -10,7 +10,7 @@
     "test-results",
     "reporter"
   ],
-  "homepage": "https://qualflare.com",
+  "homepage": "https://qualflare.com/jest-test-reporting/",
   "bugs": {
     "url": "https://github.com/Qualflare/qualflare-jest/issues"
   },
