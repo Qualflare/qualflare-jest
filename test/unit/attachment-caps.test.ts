@@ -101,12 +101,19 @@ describe('inlineFromFile', () => {
     expect(inlineFromFile('gone', path.join(dir, 'nope.txt'), undefined, config(), new AttachmentBudget(2000))).toBeUndefined();
   });
 
-  it('respects the run budget even when the file itself fits', () => {
+  it('charges the budget in ENCODED bytes, because base64 is what travels', () => {
     const file = path.join(dir, 'a.txt');
     fs.writeFileSync(file, Buffer.alloc(500));
-    const budget = new AttachmentBudget(600);
+
+    // 500 raw bytes is 668 bytes of base64 -- ceil(500/3)*4. The budget bounds
+    // what the report actually carries, so a 600-byte budget cannot hold this
+    // file at all, even though the file is under 600 bytes.
+    expect(inlineFromFile('a', file, undefined, config(), new AttachmentBudget(600))).toBeUndefined();
+
+    const budget = new AttachmentBudget(1000);
     expect(inlineFromFile('a', file, undefined, config(), budget)).toBeDefined();
-    // Second identical file fits maxAttachmentBytes but not the remaining budget.
+    expect(budget.usedBytes).toBe(668);
+    // The second needs another 668 and only 332 remain.
     expect(inlineFromFile('b', file, undefined, config(), budget)).toBeUndefined();
   });
 });
