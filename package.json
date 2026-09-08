@@ -3,12 +3,13 @@
   "version": "0.1.1",
   "description": "Native Jest reporter for Qualflare — captures status, per-attempt retry history, flakiness, attachments and author-facing metadata straight from your jest run.",
   "keywords": [
+    "qualflare",
     "jest",
     "jest-reporter",
-    "qualflare",
+    "test-reporter",
     "test-reporting",
     "test-results",
-    "reporter"
+    "flaky-tests"
   ],
   "homepage": "https://qualflare.com/jest-test-reporting/",
   "bugs": {
