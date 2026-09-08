@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.1.2
+
+Package metadata only — no code change, and nothing to do if you are already on
+0.1.1.
+
+`keywords` now matches the rest of the reporter family: `flaky-tests` and
+`test-reporter` added, the bare `reporter` dropped. The eight Qualflare
+reporters had drifted into two different keyword conventions, so a search that
+found one would miss the others.
+
 All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),

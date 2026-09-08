@@ -1,6 +1,6 @@
 {
   "name": "@qualflare/jest",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Native Jest reporter for Qualflare — captures status, per-attempt retry history, flakiness, attachments and author-facing metadata straight from your jest run.",
   "keywords": [
     "qualflare",
